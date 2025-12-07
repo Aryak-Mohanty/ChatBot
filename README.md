@@ -1,4 +1,4 @@
-# ChatBot 🤖
+# Local RAG ChatBot System 🤖
 
 
 Note: This application requires a local AI server (Ollama) and a Python proxy to run. There is no public live site for this project.
