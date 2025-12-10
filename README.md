@@ -1,98 +1,288 @@
-# Local RAG ChatBot System 🤖
+# 🤖 Local PDF Q&A Chatbot
 
+A fully offline, privacy-focused PDF and DOCX document chatbot powered by **Ollama LLMs**. Upload your documents and chat with them using local AI models—no data leaves your machine!
 
-Note: This application requires a local AI server (Ollama) and a Python proxy to run. There is no public live site for this project.
+![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)
+![JavaScript](https://img.shields.io/badge/JavaScript-ES6+-yellow.svg)
+![Ollama](https://img.shields.io/badge/Ollama-Required-green.svg)
+![License](https://img.shields.io/badge/License-Unlicense-blue.svg)
 
-The Local RAG ChatBot System is a client-side Retrieval-Augmented Generation (RAG) application designed to allow users to chat with their own documents. The system uses client-side logic to extract text from uploaded files and then leverages a Python proxy server to interface with a local Large Language Model (LLM) instance.
+---
 
+## 📋 Table of Contents
 
-<h2>🚀 Key Features</h2>
-<ol>
-  <li>Client-Side Document Processing: Extracts text from uploaded PDF or DOCX files directly in the browser.</li>
-  <li>Uses PDF.js for PDFs and Mammoth.js for DOCX files.</li>
-  <li>Local AI Integration: Utilizes a Python proxy (server.py) to bypass CORS restrictions and communicate with a locally running Ollama instance.</li>
-  <li>Semantic Search: Performs advanced semantic searches against the document text to retrieve the most relevant context.</li>
-  <li>Retrieval-Augmented Generation (RAG): Generates answers by conditioning the local LLM with context retrieved from the user's uploaded documents.</li>
-</ol>
+- [Features](#-features)
+- [Demo](#-demo)
+- [Prerequisites](#-prerequisites)
+- [Installation](#-installation)
+- [Configuration](#-configuration)
+- [Usage](#-usage)
+- [Project Structure](#-project-structure)
+- [How It Works](#-how-it-works)
+- [Known Issues & Bugs](#-known-issues--bugs)
+- [Future Roadmap](#-future-roadmap)
+- [License](#-license)
 
+---
 
-<h2>🛠️ Tech Stack</h2>
+## ✨ Features
 
-This project implements a hybrid client-server architecture:
-<table>
-  <thead>
-    <tr>
-      <th>Component</th>
-      <th>Technology</th>
-      <th>Role</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>Frontend Runtime</td>
-      <td>Browser (HTML5/ES6)</td>
-      <td>Chat window, file upload, and settings UI.</td>
-    </tr>
-    <tr>
-      <td>Styling</td>
-      <td>Bootstrap 5.3.2 & Custom CSS</td>
-      <td>User Interface design.</td>
-    </tr>
-    <tr>
-      <td>PDF Engine</td>
-      <td>PDF.js (v3.11.174)</td>
-      <td>Client-side PDF text extraction.</td>
-    </tr>
-    <tr>
-      <td>DOCX Engine</td>
-      <td>Mammoth.js</td>
-      <td>Client-side DOCX text extraction.</td>
-    </tr>
-    <tr>
-      <td>Backend Proxy</td>
-      <td>Python http.server/socketserver</td>
-      <td>Forwards browser requests to Ollama API.</td>
-    </tr>
-    <tr>
-      <td>AI Backend</td>
-      <td>Ollama (Local LLM API)</td>
-      <td>Handles vector embedding generation and chat responses.</td>
-    </tr>
-  </tbody>
-</table>
+- **🔒 Fully Local & Private**: All processing happens on your machine. No cloud APIs, no data sharing.
+- **📄 Multi-Format Support**: Supports both **PDF** and **DOCX** file formats.
+- **📚 Multi-File Upload**: Upload up to 5 documents simultaneously (queued system).
+- **🧠 Smart RAG (Retrieval-Augmented Generation)**: Uses vector embeddings for intelligent context retrieval.
+- **⚡ Streaming Responses**: Watch AI responses appear in real-time.
+- **🌓 Dark/Light Theme**: Toggle between themes with persistent preference.
+- **📊 Document Stats**: View page count, character count, and indexed chunks.
+- **🎨 Modern UI**: Clean, responsive interface built with Bootstrap 5.
+- **⚙️ Customizable**: Change Ollama API URL and model via settings.
 
+---
 
-<h2>🐞 Known Bugs</h2>
-<ol>
-  <li>Offline Functionality Limitations: While the Service Worker caches core assets (index.html, style.css, etc.), live weather data retrieval requires an active internet connection. The app currently displays a generic error or stale data when offline.</li>
-  <li>Hardcoded Dependencies: The core logic has a hardcoded dependency on specific Ollama models, limiting flexibility.</li>
-  <li>Naive Text Chunking: The current text chunking implementation uses a simple character limit approach rather than a more robust sentence-aware or sliding-window method.</li>
-  <li>Missing Vectorization Error Handling: If a request to embed text fails (e.g., due to a temporary network issue), the knowledge base becomes incomplete, but the user is not explicitly warned.</li>
-  <li>Inconsistent Server Configuration: Documentation and error messages may reference hardcoded URLs or ports that do not match the user's actual local server setup.</li>
-</ol>
+## 🎬 Demo
 
+1. Upload a PDF or DOCX file
+2. Click "Extract text" to index the document
+3. Ask questions about your document in natural language
+4. Get AI-powered answers based on the document content
 
-<h2>✨ Future Scope (Recommendations)</h2>
-<ol>
-  <li>Model Selection: Update script.js to fetch available models and allow the user to select their preferred embedding and chat models via the settings menu.</li>
-  <li>Improved Chunking: Implement a sentence-aware chunker or a sliding window approach (e.g., chunk size 500 characters with 50 character overlap) to improve context retrieval accuracy.</li>
-  <li>Robust Error Handling: Implement a retry mechanism for failed embedding requests and provide a dedicated UI alert if a document was only partially processed.</li>
-  <li>Dynamic Configuration: Implement logic to pass the server port to the frontend or use relative paths in error messages to align instructions with the actual configuration.</li>
-</ol>
+---
 
+## 📦 Prerequisites
 
-<h2>📦 Installation & Setup</h2>
+Before running this application, ensure you have the following installed:
 
-To run this project, you must have <a href="https://www.python.org/downloads/">Python </a>and <a href="https://ollama.com/download"> Ollama </a> installed locally.
-<ol>
-  <li>Clone the repository.</li>
-  <li>Install Ollama: Ensure Ollama is running and configured on the default port (127.0.0.1:11434).</li>
-  <li>Start the Python Proxy: Run the server.py file to start the proxy server (it typically defaults to port 8000).</li>
-  <li>Launch Frontend: Open http://127.0.0.1:8000/index.html in your web browser.</li>
-</ol>
+### 1. Ollama (Required)
 
+Ollama is the backbone of this application. It provides local LLM inference.
 
-<h2>📄 License & Usage</h2>
-This project is developed for educational and personal use. Redistribution or replication without permission is discouraged. API keys (or local server endpoints) included in this project should not be reused for production systems.
+**Install Ollama:**
+- **Linux/macOS**: 
+  ```bash
+  curl -fsSL https://ollama.com/install.sh | sh
+  ```
+- **Windows**: Download from [https://ollama.com/download](https://ollama.com/download)
 
-<hr>
+**Pull Required Models:**
+```bash
+# Main chat model (choose one)
+ollama pull llama3
+
+# Embedding model (REQUIRED for document search)
+ollama pull nomic-embed-text
+```
+
+> ⚠️ **Important**: The `nomic-embed-text` model is **mandatory** for the RAG functionality to work!
+
+### 2. Python 3.8+
+
+```bash
+# Check Python version
+python3 --version
+```
+
+### 3. Modern Web Browser
+
+Chrome, Firefox, Edge, or Safari (latest versions recommended).
+
+---
+
+## 🚀 Installation
+
+1. **Clone or Download the Repository:**
+   ```bash
+   git clone https://github.com/Aryak-Mohanty/pdf-qa-chatbot.git
+   cd pdf-qa-chatbot
+   ```
+
+2. **No additional Python packages required!**  
+   The server uses only the Python standard library.
+
+---
+
+## ⚙️ Configuration
+
+### API Keys & Setup
+
+**You must configure API access yourself:**
+
+1. **Ollama Setup (Local)**
+   - Install Ollama from [ollama.com](https://ollama.com)
+   - Start the Ollama service:
+     ```bash
+     ollama serve
+     ```
+   - The default API endpoint is `http://127.0.0.1:11434`
+
+2. **Custom Ollama URL (Optional)**  
+   If running Ollama on a different host/port:
+   - Set environment variable:
+     ```bash
+     export OLLAMA_URL="http://your-host:port"
+     ```
+   - Or configure via the ⚙️ Settings menu in the app
+
+3. **Model Selection**
+   - Default model: `llama3`
+   - Change via ⚙️ Settings menu
+   - Recommended models: `llama3`, `mistral`, `gemma`
+
+### External Hosting (Optional)
+
+If hosting Ollama externally, ensure CORS is enabled:
+```bash
+OLLAMA_ORIGINS="*" ollama serve
+```
+
+---
+
+## 🖥️ Usage
+
+### Quick Start
+
+1. **Start Ollama:**
+   ```bash
+   ollama serve
+   ```
+
+2. **Start the Python Server (in a new terminal):**
+   ```bash
+   python3 server.py
+   ```
+
+3. **Open in Browser:**
+   ```
+   http://localhost:3001/
+   ```
+
+### Using the Chatbot
+
+1. **Upload Documents**: Click the file input to select PDF or DOCX files (up to 5)
+2. **Extract Text**: Click "Extract text" to process and index documents
+3. **Ask Questions**: Type your question and hit "Ask" or press Enter
+4. **Clear Files**: Use the 🗑️ button to clear the file queue and knowledge base
+
+---
+
+## 📁 Project Structure
+
+### Files to Upload to GitHub
+
+```
+pdf-qa-chatbot/
+├── README.md           # This file (Documentation)
+├── index.html          # Main frontend interface
+├── script.js           # Frontend JavaScript logic
+└── server.py           # Python proxy server
+```
+
+### Files NOT to Upload
+
+| File | Reason |
+|------|--------|
+| `pdf.min.js` | CDN-loaded library (optional backup) |
+| `pdf.worker.min.js` | CDN-loaded library (optional backup) |
+| `ollama.log` | Local log file |
+| `howtorun.txt` | Personal notes (replaced by README) |
+| `test_parsing.js` | Development/testing file |
+
+### Recommended `.gitignore`
+
+Create a `.gitignore` file with:
+```gitignore
+# Logs
+*.log
+ollama.log
+
+# Local notes
+howtorun.txt
+
+# Test files
+test_*.js
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+```
+
+---
+
+## 🔧 How It Works
+
+### Architecture
+
+```
+┌──────────────────┐     ┌────────────────┐     ┌─────────────────┐
+│  Browser (UI)    │────▶│  Python Proxy  │────▶│  Ollama Server  │
+│  index.html      │     │  server.py     │     │  (Local LLM)    │
+│  script.js       │◀────│  Port: 3001    │◀────│  Port: 11434    │
+└──────────────────┘     └────────────────┘     └─────────────────┘
+```
+
+### RAG Pipeline
+
+1. **Document Processing**: PDF.js / Mammoth.js extracts text from documents
+2. **Hierarchical Chunking**: Text is split into parent chunks (600 words) and child chunks (150 words)
+3. **Embedding Generation**: Child chunks are embedded using `nomic-embed-text`
+4. **Semantic Search**: User queries are embedded and compared using cosine similarity
+5. **Context Retrieval**: Top matching parent chunks are retrieved for context
+6. **LLM Generation**: Ollama generates answers based on retrieved context
+
+---
+
+## 🐛 Known Issues & Bugs
+
+### Current Limitations
+
+| Issue | Status | Description |
+|-------|--------|-------------|
+| Large PDF Slowness | ⚠️ Known | PDFs with 50+ pages may take time to index |
+| OCR PDFs | ❌ Not Supported | Image-only PDFs without text layer won't work |
+| Memory Usage | ⚠️ Watch | Large documents consume browser memory |
+| File Limit | 📝 By Design | Maximum 5 files at a time |
+| Mobile Layout | ⚠️ Basic | Resizable panes disabled on mobile |
+
+### Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| "Cannot connect to Ollama" | Ensure `ollama serve` is running |
+| Embedding errors | Verify `nomic-embed-text` model is installed |
+| Slow responses | Try a smaller model like `mistral` |
+| CORS errors | Use the provided Python proxy server |
+| Empty extraction | Check if PDF has selectable text |
+
+---
+
+## 🚀 Future Roadmap
+
+### Planned Features
+
+- [ ] **OCR Support**: Add Tesseract.js for scanned PDF support
+- [ ] **Image Analysis**: Extract and analyze images from documents
+- [ ] **Chat History**: Persist conversation across sessions
+- [ ] **Document Preview**: Show PDF preview in sidebar
+- [ ] **Improved Chunking**: Semantic paragraph-aware chunking
+- [ ] **Model Comparison**: A/B test responses from different models
+- [ ] **Export Chat**: Download conversation as PDF/Markdown
+- [ ] **Folder Upload**: Batch process entire folders
+- [ ] **Highlights**: Show source passages used for answers
+- [ ] **Multi-language**: Support for non-English documents
+
+---
+
+## 📄 License
+
+This project is released into the **public domain** under [The Unlicense](https://unlicense.org/).
+
+You are free to copy, modify, distribute, or use the project for any purpose, without any conditions.
+
+---
+
+<p align="center">
+  Made with ❤️ for local AI enthusiasts
+</p>
