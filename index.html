@@ -445,14 +445,40 @@
     </section>
   </div>
 
+  <!-- Bootstrap - CDN with local fallback -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+
+  <!-- PDF.js - CDN with local fallback -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"
+    onerror="this.onerror=null; this.src='pdf.min.js'; console.log('📦 Using local PDF.js');"></script>
+
+  <!-- Mammoth.js - CDN with local fallback -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"
+    onerror="this.onerror=null; this.src='mammoth.browser.min.js'; console.log('📦 Using local Mammoth.js');"></script>
+
   <script>
+    // PDF.js Configuration - CDN with local fallback for worker
     window.pdfjsLib = window['pdfjs-dist/build/pdf'];
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    if (window.pdfjsLib) {
+      // Try CDN worker first, fallback to local
+      const cdnWorker = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      const localWorker = 'pdf.worker.min.js';
+
+      // Test if CDN is reachable
+      fetch(cdnWorker, { method: 'HEAD', mode: 'no-cors' })
+        .then(() => {
+          pdfjsLib.GlobalWorkerOptions.workerSrc = cdnWorker;
+        })
+        .catch(() => {
+          pdfjsLib.GlobalWorkerOptions.workerSrc = localWorker;
+          console.log('📦 Using local PDF.js worker');
+        });
+
+      // Set default to local (will be overridden if CDN works)
+      pdfjsLib.GlobalWorkerOptions.workerSrc = localWorker;
+    }
   </script>
-  <script src="script.js?v=6"></script>
+  <script src="script.js?v=7"></script>
 </body>
 
 </html>

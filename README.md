@@ -97,14 +97,14 @@ Chrome, Firefox, Edge, or Safari (latest versions recommended).
 
 2. **Dependencies:**
    
-   | Component | Dependency | Installation |
+   | Component | Dependency | How It Loads |
    |-----------|------------|--------------|
    | **Python Server** | Standard Library only | ✅ No installation needed |
-   | **PDF Parsing** | [PDF.js](https://mozilla.github.io/pdf.js/) | ✅ Loaded from CDN automatically |
-   | **DOCX Parsing** | [Mammoth.js](https://github.com/mwilliamson/mammoth.js/) | ✅ Loaded from CDN automatically |
-   | **UI Framework** | [Bootstrap 5](https://getbootstrap.com/) | ✅ Loaded from CDN automatically |
+   | **PDF Parsing** | [PDF.js](https://mozilla.github.io/pdf.js/) | 🌐 CDN first → 📦 Local fallback |
+   | **DOCX Parsing** | [Mammoth.js](https://github.com/mwilliamson/mammoth.js/) | 🌐 CDN first → 📦 Local fallback |
+   | **UI Framework** | [Bootstrap 5](https://getbootstrap.com/) | 🌐 CDN only |
 
-   > 💡 **Note**: All JavaScript libraries are loaded from CDN when you open the app in your browser. No `npm install` or manual downloads required!
+   > 💡 **Offline Support**: If no internet connection, PDF.js and Mammoth.js automatically load from local files included in the repository. No manual setup required!
 
 ---
 
@@ -178,18 +178,19 @@ OLLAMA_ORIGINS="*" ollama serve
 
 ```
 pdf-qa-chatbot/
-├── README.md           # This file (Documentation)
-├── index.html          # Main frontend interface
-├── script.js           # Frontend JavaScript logic
-└── server.py           # Python proxy server
+├── README.md               # This file (Documentation)
+├── index.html              # Main frontend interface
+├── script.js               # Frontend JavaScript logic
+├── server.py               # Python proxy server
+├── pdf.min.js              # PDF.js library (offline fallback)
+├── pdf.worker.min.js       # PDF.js worker (offline fallback)
+└── mammoth.browser.min.js  # Mammoth.js library (offline fallback)
 ```
 
 ### Files NOT to Upload
 
 | File | Reason |
 |------|--------|
-| `pdf.min.js` | CDN-loaded library (optional backup) |
-| `pdf.worker.min.js` | CDN-loaded library (optional backup) |
 | `ollama.log` | Local log file |
 | `howtorun.txt` | Personal notes (replaced by README) |
 | `test_parsing.js` | Development/testing file |
