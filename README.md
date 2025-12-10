@@ -95,8 +95,16 @@ Chrome, Firefox, Edge, or Safari (latest versions recommended).
    cd pdf-qa-chatbot
    ```
 
-2. **No additional Python packages required!**  
-   The server uses only the Python standard library.
+2. **Dependencies:**
+   
+   | Component | Dependency | Installation |
+   |-----------|------------|--------------|
+   | **Python Server** | Standard Library only | ✅ No installation needed |
+   | **PDF Parsing** | [PDF.js](https://mozilla.github.io/pdf.js/) | ✅ Loaded from CDN automatically |
+   | **DOCX Parsing** | [Mammoth.js](https://github.com/mwilliamson/mammoth.js/) | ✅ Loaded from CDN automatically |
+   | **UI Framework** | [Bootstrap 5](https://getbootstrap.com/) | ✅ Loaded from CDN automatically |
+
+   > 💡 **Note**: All JavaScript libraries are loaded from CDN when you open the app in your browser. No `npm install` or manual downloads required!
 
 ---
 
