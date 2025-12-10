@@ -187,37 +187,6 @@ pdf-qa-chatbot/
 └── mammoth.browser.min.js  # Mammoth.js library (offline fallback)
 ```
 
-### Files NOT to Upload
-
-| File | Reason |
-|------|--------|
-| `ollama.log` | Local log file |
-| `howtorun.txt` | Personal notes (replaced by README) |
-| `test_parsing.js` | Development/testing file |
-
-### Recommended `.gitignore`
-
-Create a `.gitignore` file with:
-```gitignore
-# Logs
-*.log
-ollama.log
-
-# Local notes
-howtorun.txt
-
-# Test files
-test_*.js
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# IDE
-.vscode/
-.idea/
-```
-
 ---
 
 ## 🔧 How It Works
