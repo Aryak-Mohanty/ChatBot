@@ -1,5 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
   const fileInput = document.getElementById("pdfFile");
+  const clearFilesBtn = document.getElementById("clearFilesBtn");
+  const fileListContainer = document.getElementById("file-list");
   const extractBtn = document.getElementById("extractBtn");
   const chatBox = document.getElementById("messages");
   const userInput = document.getElementById("query");
@@ -18,15 +20,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const statChunks = document.getElementById("stat-chunks");
   const statFile = document.getElementById("stat-file");
 
-  let pdfText = "";
-  let chunks = [];
-  let chunkEmbeddings = []; // Store embeddings here
+  let parentChunks = []; // Store full context chunks { id, text, source }
+  let chunkEmbeddings = []; // Store searching chunks { text, embedding, parentId, source }
 
-  // Check if running via file://
-  if (window.location.protocol === "file:") {
-    addMessage("bot", "🛑 ERROR: You are opening this file directly!");
-    addMessage("bot", "👉 Please open http://localhost:3001 in your browser.");
-    return;
+  // --- Configuration Fix: Use Local Worker if available ---
+  if (window.pdfjsLib) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   }
 
   // Check connection on load
@@ -59,13 +58,64 @@ document.addEventListener("DOMContentLoaded", () => {
     API_URL = apiUrlInput.value.replace(/\/$/, "");
   });
 
-  // Enable/disable extract
-  fileInput.addEventListener("change", () => {
-    extractBtn.disabled = !fileInput.files.length;
-    if (fileInput.files.length) {
-      statFile.textContent = fileInput.files[0].name;
+  // --- Multi-File Staging Logic ---
+  let stagedFiles = [];
+
+  function updateFileUI() {
+    const count = stagedFiles.length;
+    extractBtn.disabled = count === 0;
+
+    // Update Badge
+    const badge = document.getElementById("file-count-badge");
+    if (badge) badge.textContent = `${count} Files`;
+
+    // Update Text
+    if (count === 0) {
+      statFile.textContent = "—";
+      fileListContainer.innerHTML = "";
+    } else {
+      statFile.textContent = `${count} file(s) queued`;
+      // Update List
+      fileListContainer.innerHTML = stagedFiles.map(f => `<div>📄 ${f.name}</div>`).join("");
     }
+  }
+
+  fileInput.addEventListener("change", () => {
+    if (!fileInput.files.length) return;
+
+    // Accumulate files (avoid duplicates by name)
+    for (const file of fileInput.files) {
+      if (!stagedFiles.some(f => f.name === file.name)) {
+        if (stagedFiles.length >= 5) {
+          alert("⚠️ Limit reached: Max 5 files.");
+          break;
+        }
+        stagedFiles.push(file);
+      }
+    }
+
+    // Clear input so same file can be selected again
+    fileInput.value = "";
+    updateFileUI();
   });
+
+  if (clearFilesBtn) {
+    clearFilesBtn.addEventListener("click", () => {
+      stagedFiles = [];
+      updateFileUI();
+      fileInput.value = "";
+      chunkEmbeddings = []; // Clear knowledge base
+      addMessage("bot", "Files and knowledge base cleared.");
+
+      const header = document.getElementById("chat-header");
+      if (header) header.textContent = "💬 Ask anything";
+
+      // Reset Stats
+      if (statPages) statPages.textContent = "0";
+      if (statChars) statChars.textContent = "0";
+      if (statChunks) statChunks.textContent = "0";
+    });
+  }
 
   // Helpers
   async function embedText(text) {
@@ -92,13 +142,50 @@ document.addEventListener("DOMContentLoaded", () => {
     return dot / (magA * magB);
   }
 
-  function chunkText(text, size = 200) {
+  function calculateKeywordScore(text, query) {
+    const textWords = new Set(text.toLowerCase().split(/\s+/));
+    const queryWords = query.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+    if (queryWords.length === 0) return 0;
+    let matchCount = 0;
+    for (const w of queryWords) {
+      if (textWords.has(w)) matchCount++;
+    }
+    return matchCount / queryWords.length;
+  }
+
+  function chunkText(text, size = 200, overlap = 50) {
     const words = text.split(/\s+/).filter(w => w.length > 0);
     let out = [];
-    for (let i = 0; i < words.length; i += size) {
-      out.push(words.slice(i, i + size).join(" "));
+    const step = size - overlap;
+    for (let i = 0; i < words.length; i += (step > 0 ? step : size)) {
+      const chunk = words.slice(i, i + size).join(" ");
+      if (chunk.trim()) out.push(chunk);
+      if (i + size >= words.length) break;
     }
     return out;
+  }
+
+  // Hierarchical Chunking
+  function createParentChildChunks(text, sourceName) {
+    // Parent: Large Context (e.g., 600 words)
+    const parents = chunkText(text, 600, 100);
+    let childNodes = [];
+    let parentNodes = [];
+
+    parents.forEach((pText, pIndex) => {
+      // Store Parent
+      const pId = `${sourceName}_${pIndex}`;
+      parentNodes.push({ id: pId, text: pText, source: sourceName });
+
+      // Create Children from this Parent (e.g., 150 words)
+      // We chunk the PARENT text, not the original full text, so children are subsets of this parent.
+      const children = chunkText(pText, 150, 30);
+      children.forEach(cText => {
+        childNodes.push({ text: cText, parentId: pId, source: sourceName });
+      });
+    });
+
+    return { parents: parentNodes, children: childNodes };
   }
 
   function addMessage(sender, text) {
@@ -107,89 +194,118 @@ document.addEventListener("DOMContentLoaded", () => {
     msg.textContent = (sender === "user" ? "🧑 " : "🤖 ") + text;
     chatBox.appendChild(msg);
     chatBox.scrollTop = chatBox.scrollHeight;
-    return msg; // return reference to update if needed
+    return msg;
   }
 
-  // PDF/DOCX extraction
+  // --- EXTRACTION LOGIC ---
   extractBtn.addEventListener("click", async () => {
-    const file = fileInput.files[0];
-    if (!file) return alert("Please choose a file first");
+    const files = stagedFiles;
+    if (!files.length) return alert("Please add files first");
 
     extractBtn.disabled = true;
     extractBtn.textContent = "Extracting...";
 
-    const reader = new FileReader();
-    reader.onload = async function (e) {
-      const typedArray = new Uint8Array(e.target.result);
+    let totalPages = 0;
+    let totalChars = 0;
+
+    // Reset Knowledge Base
+    parentChunks = [];
+    chunkEmbeddings = []; // Will fill this progressively
+
+    // const files = stagedFiles; // REMOVED duplicate
+
+    // Process files sequentially
+    for (let fIndex = 0; fIndex < files.length; fIndex++) {
+      const file = files[fIndex];
+      addMessage("bot", `📄 Processing file (${fIndex + 1}/${files.length}): ${file.name}...`);
 
       try {
-        let fullText = "";
-        let fullChars = 0;
+        const arrayBuffer = await file.arrayBuffer();
+        let fileText = "";
 
-        if (file.type === "application/pdf") {
+        if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
           if (!window.pdfjsLib) throw new Error("pdf.js library not loaded");
+          const typedArray = new Uint8Array(arrayBuffer);
           const pdf = await window.pdfjsLib.getDocument({ data: typedArray }).promise;
-          statPages.textContent = pdf.numPages;
+          totalPages += pdf.numPages;
 
           for (let i = 1; i <= pdf.numPages; i++) {
-            try {
-              const page = await pdf.getPage(i);
-              const content = await page.getTextContent({ includeMarkedContent: true });
-              const strings = content.items.map(it => it.str).join("\n");
-              fullText += "\n" + strings;
-              fullChars += strings.length;
-            } catch (pageErr) {
-              console.error(`Error on page ${i}:`, pageErr);
-              addMessage("bot", `⚠️ Error reading page ${i}: ${pageErr.message}`);
-            }
+            const page = await pdf.getPage(i);
+            const content = await page.getTextContent({ includeMarkedContent: true });
+            const strings = content.items.map(it => it.str).join("\n");
+            fileText += "\n" + strings;
           }
-        } else if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+        } else if (
+          file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+          file.name.toLowerCase().endsWith(".docx")
+        ) {
           if (!window.mammoth) throw new Error("mammoth.js library not loaded");
-          const result = await window.mammoth.extractRawText({ arrayBuffer: e.target.result });
-          fullText = result.value;
-          fullChars = fullText.length;
-          statPages.textContent = "N/A";
+          const result = await window.mammoth.extractRawText({ arrayBuffer: arrayBuffer });
+          fileText = result.value;
         } else {
-          throw new Error("Unsupported file type");
+          addMessage("bot", `⚠️ Skipped ${file.name}: Unsupported type.`);
+          continue;
         }
 
-        if (fullChars === 0) {
-          addMessage("bot", "⚠️ Warning: No text extracted. This file might be empty or scanned.");
-          console.warn("Extraction yielded 0 characters.");
-          pdfText = "";
-          chunks = [];
-        } else {
-          pdfText = fullText;
-          chunks = chunkText(pdfText, 200);
+        const fileChars = fileText.length;
+        totalChars += fileChars;
+
+        if (fileChars === 0) {
+          console.warn(`File ${file.name} yielded 0 chars.`);
+          continue;
         }
 
-        statChars.textContent = fullChars;
-        statChunks.textContent = chunks.length;
-
-        // Generate embeddings immediately
-        addMessage("bot", `📄 Text extracted. Generating embeddings for ${chunks.length} chunks...`);
-
-        chunkEmbeddings = [];
-        for (let i = 0; i < chunks.length; i++) {
-          const emb = await embedText(chunks[i]);
-          if (emb) chunkEmbeddings.push({ text: chunks[i], embedding: emb });
+        if (fileChars === 0) {
+          console.warn(`File ${file.name} yielded 0 chars.`);
+          continue;
         }
 
-        if (chunkEmbeddings.length === 0) {
-          addMessage("bot", "⚠️ Failed to generate embeddings. Check your API connection.");
-        } else {
-          addMessage("bot", `✅ Ready! Processed ${chunkEmbeddings.length} chunks.`);
+        // --- PARENT-CHILD CHUNKING ---
+        const { parents, children } = createParentChildChunks(fileText, file.name);
+        console.log(`[${file.name}] Generated ${parents.length} Parents and ${children.length} Children.`);
+
+        // Add to global stores
+        parentChunks.push(...parents);
+
+        // Generate Embeddings for CHILDREN only (Efficiency)
+        addMessage("bot", `🧠 Indexing ${file.name} (${children.length} fragments)...`);
+
+        const batchSize = 5;
+        for (let i = 0; i < children.length; i += batchSize) {
+          const batch = children.slice(i, i + batchSize);
+          await Promise.all(batch.map(async (childNode) => {
+            const emb = await embedText(childNode.text);
+            if (emb) {
+              chunkEmbeddings.push({
+                text: childNode.text, // Child Text (for search)
+                embedding: emb,
+                parentId: childNode.parentId, // Link to Parent
+                source: childNode.source
+              });
+            }
+          }));
         }
 
       } catch (err) {
         console.error(err);
-        alert("Error reading file: " + err.message);
-      } finally {
-        extractBtn.disabled = false;
-        extractBtn.textContent = "Extract text";
+        addMessage("bot", `❌ Error reading ${file.name}: ${err.message}`);
       }
-    };
-    reader.readAsArrayBuffer(file);
+    }
+
+    statPages.textContent = totalPages > 0 ? totalPages : "N/A";
+    statChars.textContent = totalChars;
+    statChunks.textContent = chunkEmbeddings.length;
+
+    if (chunkEmbeddings.length === 0) {
+      addMessage("bot", "⚠️ Failed to index documents.");
+    } else {
+      addMessage("bot", `✅ Ready! Knowledge base updated with ${parentChunks.length} Context Blocks and ${chunkEmbeddings.length} Search Nodes.`);
+      const header = document.getElementById("chat-header");
+      if (header) header.textContent = "💬 Ask about the PDF(s)";
+    }
+
+    extractBtn.disabled = false;
+    extractBtn.textContent = "Extract text";
   });
 
   // Chat
@@ -200,7 +316,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Enable send button if there is input
   userInput.addEventListener("input", () => {
     sendBtn.disabled = !userInput.value.trim();
   });
@@ -217,47 +332,93 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       let prompt = "";
 
-      // LOGIC: Check if we have document context
       if (chunkEmbeddings.length > 0) {
-        // --- STRICT MODE ---
         const qEmbed = await embedText(question);
         if (!qEmbed) {
           botMsg.textContent = "🤖 ⚠️ Error generating question embedding.";
           return;
         }
 
-        let scored = chunkEmbeddings.map(c => ({
-          text: c.text,
-          score: cosineSim(qEmbed, c.embedding)
-        }));
+        // --- RANKING & DIVERSITY ---
+        // 1. Initial Score (Vector + Keyword)
+        let candidates = chunkEmbeddings.map(c => {
+          const vecScore = cosineSim(qEmbed, c.embedding);
+          const kwScore = calculateKeywordScore(c.text, question);
+          return {
+            ...c,
+            score: (vecScore * 0.7) + (kwScore * 0.3)
+          };
+        });
 
-        scored.sort((a, b) => b.score - a.score);
-        const topChunks = scored.slice(0, 5).map(s => s.text).join("\n\n");
+        // 2. Sort by Score
+        candidates.sort((a, b) => b.score - a.score);
 
-        // The STRICT prompt
-        prompt = `You are a strict document assistant. 
+        // 3. Source Diversity Selection
+        // Goal: Ensure we get top chunks from *each* file if they are relevant
+        const topCandidates = [];
+        const seenParentIds = new Set();
+        const seenSources = new Set();
+
+        // Take Top 3 from EACH source first (to ensure coverage)
+        const candidatesBySource = {};
+        candidates.forEach(c => {
+          if (!candidatesBySource[c.source]) candidatesBySource[c.source] = [];
+          candidatesBySource[c.source].push(c);
+        });
+
+        Object.keys(candidatesBySource).forEach(src => {
+          // Take top 2 from this source
+          candidatesBySource[src].slice(0, 2).forEach(c => {
+            if (!seenParentIds.has(c.parentId)) {
+              topCandidates.push(c);
+              seenParentIds.add(c.parentId);
+              seenSources.add(c.source);
+            }
+          });
+        });
+
+        // 4. Fill remaining slots with globally best chunks (up to limit)
+        for (const c of candidates) {
+          if (topCandidates.length >= 8) break; // Hard limit chunks
+          if (!seenParentIds.has(c.parentId)) {
+            topCandidates.push(c);
+            seenParentIds.add(c.parentId);
+          }
+        }
+
+        // 5. Retrieve PARENT Contexts
+        // Map selected Child Chunks -> Parent Texts
+        const contextTexts = topCandidates.map(child => {
+          const parent = parentChunks.find(p => p.id === child.parentId);
+          return parent ? `[Source: ${parent.source}]\n${parent.text}` : child.text;
+        });
+
+        const contextText = contextTexts.join("\n\n---\n\n");
+
+        prompt = `You are a helpful document assistant. 
 Instructions:
-1. Answer the Question ONLY based on the Context provided below.
-2. Do not use outside knowledge.
-3. If the answer cannot be found in the Context, your answer must be exactly: "I can only answer questions about the extracted document."
+1. Answer the Question based ONLY on the Context provided below.
+2. The Context is a collection of excerpts from different files (marked by [Source]).
+3. Integrate information from multiple sources if needed to answer fully.
+4. If the answer is not in the Context, state that you cannot find the information.
 
 Context:
-${topChunks}
+${contextText}
 
 Question: ${question}
 Answer:`;
 
       } else {
-        // --- GENERAL MODE (No file uploaded) ---
-        prompt = `You are a helpful AI assistant. Answer the following question freely:\n\nQuestion: ${question}\nAnswer:`;
+        prompt = `You are a helpful AI assistant. Answer the following question:\n\nQuestion: ${question}\nAnswer:`;
       }
 
       const response = await fetch(`${API_URL}/api/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "llama2",
-          prompt: prompt
+          model: "llama2", // Ensure this matches your specific model tag
+          prompt: prompt,
+          stream: true
         })
       });
 
@@ -313,7 +474,7 @@ Answer:`;
     }
   });
 
-  // Theme toggle (existing logic)
+  // Theme toggle
   const iconSun = document.getElementById("icon-sun");
   const iconMoon = document.getElementById("icon-moon");
 
