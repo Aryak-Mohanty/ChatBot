@@ -47,6 +47,8 @@ A fully offline, privacy-focused PDF and DOCX document chatbot powered by **Olla
 3. Ask questions about your document in natural language
 4. Get AI-powered answers based on the document content
 
+> 💬 **Want a Live Demo?** Contact me to schedule a live demonstration of this project!
+
 ---
 
 ## 📦 Prerequisites
