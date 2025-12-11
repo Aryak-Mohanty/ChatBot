@@ -17,6 +17,7 @@ A fully offline, privacy-focused PDF and DOCX document chatbot powered by **Olla
 - [Installation](#-installation)
 - [Configuration](#-configuration)
 - [Usage](#-usage)
+- [Public Access (ngrok)](#-public-access-ngrok)
 - [Project Structure](#-project-structure)
 - [How It Works](#-how-it-works)
 - [Known Issues & Bugs](#-known-issues--bugs)
@@ -172,6 +173,58 @@ OLLAMA_ORIGINS="*" ollama serve
 
 ---
 
+## 🌍 Public Access (ngrok)
+
+Share your chatbot with anyone on the internet while running it locally. When you stop the server, public access is **immediately terminated**.
+
+### One-Time Setup
+
+1. **Install ngrok:**
+   - Download from [https://ngrok.com/download](https://ngrok.com/download)
+   - Extract and move to your PATH (e.g., `/usr/local/bin/`)
+
+2. **Create ngrok Account:**
+   - Sign up at [https://ngrok.com](https://ngrok.com)
+   - Get your authtoken from the dashboard
+
+3. **Configure ngrok:**
+   ```bash
+   ngrok config add-authtoken YOUR_AUTH_TOKEN
+   ```
+
+### Start with Public Access
+
+**Option A: Automated Script (Recommended)**
+```bash
+./start_with_ngrok.sh
+```
+This starts Ollama, the server, and ngrok together. Press `Ctrl+C` to stop everything.
+
+**Option B: Manual Start**
+```bash
+# Terminal 1
+ollama serve
+
+# Terminal 2
+python3 server.py
+
+# Terminal 3
+ngrok http 3001
+```
+
+### Sharing
+
+ngrok will display a URL like:
+```
+Forwarding  https://abc123.ngrok-free.app -> http://localhost:3001
+```
+
+Share this URL with anyone! They can access your chatbot from anywhere in the world.
+
+> ⚠️ **Note**: The free ngrok plan shows a warning page on first visit. Users just need to click "Visit Site" to proceed.
+
+---
+
 ## 📁 Project Structure
 
 ### Files to Upload to GitHub
@@ -182,6 +235,7 @@ pdf-qa-chatbot/
 ├── index.html              # Main frontend interface
 ├── script.js               # Frontend JavaScript logic
 ├── server.py               # Python proxy server
+├── start_with_ngrok.sh     # Public access launcher script
 ├── pdf.min.js              # PDF.js library (offline fallback)
 ├── pdf.worker.min.js       # PDF.js worker (offline fallback)
 └── mammoth.browser.min.js  # Mammoth.js library (offline fallback)
